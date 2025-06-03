@@ -194,8 +194,13 @@ function long_div(n, k, m, a, b) {
         remainder_ans = remainder[i];
     }
     
-
-    return quotient;
+    for (var i = 0; i < k; i++){
+        out[i] = reminder[i];
+    }
+    for (var i = k; i < k + m + 1; i++){
+        out[i] = quotient[i - k];
+    }
+    return out;
 }
 
 function short_div_norm(n, k, a, b) {
