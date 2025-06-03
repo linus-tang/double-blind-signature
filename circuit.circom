@@ -1,70 +1,105 @@
-pragma circom 2.0.0;
+pragma circom 2.1.6;
 
-// Helper function to compute hash
-template Hash() {
-    signal input in;
-    signal output out;
-    
-    // Simple hash function using field arithmetic
-    // In a real implementation, you'd want to use a proper hash function
-    out <== in * in + 7;
+include "poseidon.circom";
+include "bigint.circom";
+
+template Binary (numBits) {
+    signal input num;
+    signal output bits[numBits];
+
+    var accum;
+    for (var i = 0; i < numBits; i ++) {
+        bits[i] <-- (num >> i) & 1;
+        bits[i] === bits[i] * bits[i];
+        accum += (2**i) * bits[i];
+    }
+    accum === num;
 }
 
-// Circuit for blinding a message
-template BlindMessage() {
+template Modulo (numBits) {
+    signal input a;
+    signal input p;
+    signal quotient;
+    signal product;
+    signal p_minus_one_minus_remainder;
+    signal output remainder;
+
+    component range_check_1;
+    component range_check_2;
+
+    quotient <-- a \ p;
+    product <== p * quotient;
+    remainder <== a - product;
+    p_minus_one_minus_remainder <== p - 1 - remainder;
+
+    range_check_1 = Binary(numBits);
+    range_check_2 = Binary(numBits);
+    range_check_1.num <== remainder;
+    range_check_2.num <== p_minus_one_minus_remainder;
+}
+
+template SmallExpMod (numBits_p, numBits_b) { // a**b mod p
+    signal input a;
+    signal input b;
+    signal input p;
+    signal b_bits[numBits_b];
+    signal powers_of_a[numBits_b];
+    signal select_one_or_pow[numBits_b];
+    signal intermediate_products[numBits_b + 1];
+    signal output exp;
+
+    component bin;
+    component mod[numBits_b];
+    component more_mod[numBits_b];
+
+
+    bin = Binary (numBits_b);
+    bin.num <== b;
+    b_bits <== bin.bits;
+
+    powers_of_a[0] <== a;
+    for (var i = 1; i < numBits_b; i ++) {
+        mod[i] = Modulo(numBits_p);
+        mod[i].a <== powers_of_a[i-1] * powers_of_a[i-1];
+        mod[i].p <== p;
+        powers_of_a[i] <== mod[i].remainder;
+    }
+
+    intermediate_products[0] <== 1;
+    for (var i = 0; i < numBits_b; i ++) {
+        more_mod[i] = Modulo(numBits_p);
+        select_one_or_pow[i] <== b_bits[i] * (powers_of_a[i] - 1) + 1;
+        more_mod[i].a <== intermediate_products[i] * (select_one_or_pow[i]);
+        more_mod[i].p <== p;
+        intermediate_products[i+1] <== more_mod[i].remainder;
+    }
+
+    exp <== intermediate_products[numBits_b];
+
+}
+
+template GroupSignature(numBits_p, numBits_b, sizeGroup){
     signal input message;
-    signal input blinding_factor;
-    signal output blinded_message;
-    
-    blinded_message <== message + blinding_factor;
+    signal input signer_sk, public_N[sizeGroup], public_e[sizeGroup];
+    signal signature_ver[sizeGroup];
+
+    component ver[sizeGroup];
+
+    for (var i = 0; i < sizeGroup; i++) {
+        ver[i] = SmallExpMod(numBits_p, numBits_b);
+        ver[i].a <== signer_sk;
+        ver[i].b <== public_e[i];
+        ver[i].p <== public_N[i];
+        signature_ver[i] <== ver[i].exp;
+    }
+
+    signal help[sizeGroup];
+    help[0] <== signature_ver[0] - message;
+    for (var i = 1; i < sizeGroup; i++){
+        help[i] <== help[i - 1] * (signature_ver[i] - message);
+    }
+    help[sizeGroup - 1] === 0;
 }
 
-// Circuit for signing a blinded message
-template SignBlindedMessage() {
-    signal input blinded_message;
-    signal input private_key;
-    signal output signature;
-    
-    signature <== blinded_message * private_key;
-}
+component main = GroupSignature (16,17,20);
 
-// Circuit for unblinding a signature
-template UnblindSignature() {
-    signal input blinded_signature;
-    signal input blinding_factor;
-    signal input private_key;
-    signal output unblinded_signature;
-    
-    unblinded_signature <== blinded_signature - (blinding_factor * private_key);
-}
-
-// Main circuit that combines all steps
-template BlindSignature() {
-    // Inputs
-    signal input message;
-    signal input blinding_factor;
-    signal input private_key;
-    
-    // Outputs
-    signal output final_signature;
-    
-    // Components
-    component blind = BlindMessage();
-    component sign = SignBlindedMessage();
-    component unblind = UnblindSignature();
-    
-    // Connect the components
-    blind.message <== message;
-    blind.blinding_factor <== blinding_factor;
-    
-    sign.blinded_message <== blind.blinded_message;
-    sign.private_key <== private_key;
-    
-    unblind.blinded_signature <== sign.signature;
-    unblind.blinding_factor <== blinding_factor;
-    unblind.private_key <== private_key;
-    
-    final_signature <== unblind.unblinded_signature;
-}
-
-component main = BlindSignature(); 
