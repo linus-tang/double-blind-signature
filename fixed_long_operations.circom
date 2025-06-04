@@ -28,75 +28,6 @@ function SplitThreeFn(in, n, m, k) {
     return [in % (1 << n), (in \ (1 << n)) % (1 << m), (in \ (1 << (n + m))) % (1 << k)];
 }
 
-// in is an m bit number
-// split into ceil(m/n) n-bit registers
-function splitOverflowedRegister(m, n, in) {
-    var nRegisters = div_ceil(m, n);
-    var out[nRegisters];  // Exact size needed
-
-    for (var i = 0; i < nRegisters; i++) {
-        out[i] = (in \ (1 << (n * i))) % (1 << n);
-    }
-    
-    return out;
-}
-
-// m bits per overflowed register (values are potentially negative)
-// n bits per properly-sized register
-// in has k registers
-function getProperRepresentation(m, n, k, in) {
-    var ceilMN = div_ceil(m, n);
-    var maxSize = k + ceilMN;
-    
-    var pieces[k][ceilMN];  // k x ceilMN matrix
-    
-    // Initialize pieces array
-    for (var i = 0; i < k; i++) {
-        if (isNegative(in[i]) == 1) {
-            var negPieces[ceilMN] = splitOverflowedRegister(m, n, -1 * in[i]);
-            for (var j = 0; j < ceilMN; j++) {
-                pieces[i][j] = -1 * negPieces[j];
-            }
-        } else {
-            var posPieces[ceilMN] = splitOverflowedRegister(m, n, in[i]);
-            for (var j = 0; j < ceilMN; j++) {
-                pieces[i][j] = posPieces[j];
-            }
-        }
-    }
-
-    var out[maxSize];     // Size k + ceilMN
-    var carries[maxSize]; // Size k + ceilMN
-    
-    // Initialize arrays
-    for (var i = 0; i < maxSize; i++) {
-        out[i] = 0;
-        carries[i] = 0;
-    }
-
-    // Process each register
-    for (var registerIdx = 0; registerIdx < maxSize; registerIdx++) {
-        var thisRegisterValue = registerIdx > 0 ? carries[registerIdx - 1] : 0;
-
-        var start = registerIdx >= ceilMN ? registerIdx - ceilMN + 1 : 0;
-        
-        for (var i = start; i <= registerIdx && i < k; i++) {
-            thisRegisterValue += pieces[i][registerIdx - i];
-        }
-
-        if (isNegative(thisRegisterValue) == 1) {
-            var thisRegisterAbs = -1 * thisRegisterValue;
-            out[registerIdx] = (1 << n) - (thisRegisterAbs % (1 << n));
-            carries[registerIdx] = -1 * (thisRegisterAbs \ (1 << n)) - 1;
-        } else {
-            out[registerIdx] = thisRegisterValue % (1 << n);
-            carries[registerIdx] = thisRegisterValue \ (1 << n);
-        }
-    }
-
-    return out;
-}
-
 // 1 if true, 0 if false
 function long_gt(n, k, a, b) {
     for (var i = k - 1; i >= 0; i--) {
@@ -106,7 +37,10 @@ function long_gt(n, k, a, b) {
     return 0;
 }
 
-function long_sub(n, k, a, b) {
+template long_sub(n, k){
+    signal input a[k];
+    signal input b[k];
+    signal output out[k];
     var diff[k];    // Size k
     var borrow[k];  // Size k
     
@@ -129,36 +63,53 @@ function long_sub(n, k, a, b) {
             }
         }
     }
-    return diff;
+    out <-- diff;
 }
 
-function long_scalar_mult(n, k, a, b) {
-    var out[k + 1];  // Size k + 1 for overflow
+template long_scalar_mult(n, k){
+    signal input a;
+    signal input b[k];
+    signal output out[k + 1];
+    var result[k + 1];  // Size k + 1 for overflow
     
     for (var i = 0; i <= k; i++) {
-        out[i] = 0;
+        result[i] = 0;
     }
     
     for (var i = 0; i < k; i++) {
-        var temp = out[i] + (a * b[i]);
-        out[i] = temp % (1 << n);
-        out[i + 1] = out[i + 1] + (temp \ (1 << n));
+        var temp = result[i] + (a * b[i]);
+        result[i] = temp % (1 << n);
+        result[i + 1] = result[i + 1] + (temp \ (1 << n));
     }
-    return out;
+    for (var i = 0; i < k + 1; i++){
+        out[i] <-- result[i];
+    }
+
 }
 
-function long_div(n, k, m, a, b) {
+//n bits per register
+// a has k + m registers
+// b has k registers
+// outputs k + m + 1 register 
+// output = remainder || quotient, result of long division a / b
+// remainder has k registers
+// quotient has m + 1 register
+template long_div(n, k, m){
+    signal input a[k + m];
+    signal input b[k];
+    signal output out[m + k + 1];
+
     var quotient[m + 1];     // quotient size m+1, remainder size k
-    var remainder_ans[k];
     var remainder[m + k];   // Size m + k
     var dividend[k + 1];    // Size k + 1
     
     // Initialize arrays
-    remainder = a
+    remainder = a;
     
     for (var i = 0; i <= k; i++) {
         dividend[i] = 0;
     }
+    //component short_division[m + 1];
 
     for (var i = m; i >= 0; i--) {
         if (i == m) {
@@ -171,10 +122,10 @@ function long_div(n, k, m, a, b) {
                 dividend[j] = remainder[j + i];
             }
         }
-
-        quotient[i] = short_div(n, k, dividend, b);
-        
-        var mult_shift[k + 1] = long_scalar_mult(n, k, quotient[i], b);
+        log("we divide by", k);
+        quotient[i] = short_div(n, k)(dividend, b);
+        log("we got", quotient[i]);
+        var mult_shift[k + 1] = long_scalar_mult(n, k) (quotient[i], b);
         var subtrahend[m + k];
         
         for (var j = 0; j < m + k; j++) {
@@ -187,53 +138,100 @@ function long_div(n, k, m, a, b) {
             }
         }
         
-        remainder = long_sub(n, m + k, remainder, subtrahend);
-    }
-    
-    for (var i = 0; i < k; i++) {
-        remainder_ans = remainder[i];
+        remainder = long_sub(n, m + k) (remainder, subtrahend);
     }
     
     for (var i = 0; i < k; i++){
-        out[i] = reminder[i];
+        out[i] <-- remainder[i];
     }
     for (var i = k; i < k + m + 1; i++){
-        out[i] = quotient[i - k];
+        out[i] <-- quotient[i - k];
     }
-    return out;
+    
 }
 
-function short_div_norm(n, k, a, b) {
-    var qhat = (a[k] * (1 << n) + a[k - 1]) \ b[k - 1];
+template short_div_norm(n, k){
+    signal input a[k + 1];
+    signal input b[k];
+    signal output out;
+    log("we want to divide by", k);
+    var flag_zero = (b[k - 1] == 0) ? 1 : 0;
+    var qhat = (a[k] * (1 << n) + a[k - 1]) \ (b[k - 1] + flag_zero);
     if (qhat > (1 << n) - 1) {
         qhat = (1 << n) - 1;
     }
 
-    var mult[k + 1] = long_scalar_mult(n, k, qhat, b);
-    if (long_gt(n, k + 1, mult, a) == 1) {
-        mult = long_sub(n, k + 1, mult, b);
-        if (long_gt(n, k + 1, mult, a) == 1) {
-            return qhat - 2;
-        } else {
-            return qhat - 1;
-        }
+    var mult[k + 1];
+    component multiply = long_scalar_mult(n, k);
+    multiply.a <-- qhat;
+    for (var i = 0; i < k; i++){
+        multiply.b[i] <-- b[i];
     }
-    return qhat;
+    for (var i = 0; i < k + 1; i++){
+        mult[i] = multiply.out[i];
+    }
+
+    var flag = long_gt(n, k + 1, mult, a);
+    component subtract = long_sub(n, k + 1);
+    subtract.a <-- mult;
+    for (var i = 0; i < k; i++){
+        subtract.b[i] <-- b[i];
+    }
+    subtract.b[k] <-- 0;
+    mult = subtract.out;
+    var flag2 = long_gt(n, k + 1, mult, a);
+    out <-- qhat - flag - flag2 * flag;
+    
 }
 
-function short_div(n, k, a, b) {
+template short_div(n, k) {
+    signal input a[k + 1];
+    signal input b[k];
+    signal output out;
     var scale = (1 << n) \ (1 + b[k - 1]);
-    var norm_a[k + 1] = long_scalar_mult(n, k + 1, scale, a);
-    var norm_b[k + 1] = long_scalar_mult(n, k, scale, b);
+    var norm_a[k + 1];
+    component mult_a = long_scalar_mult(n, k + 1);
+    mult_a.a <-- scale;
+    for (var i = 0; i < k + 1; i++){
+        mult_a.b[i] <-- a[i];
+    }
+    for (var i = 0; i < k + 1; i++){
+        norm_a[i] = mult_a.out[i];
+    }
+    var norm_b[k + 1];
+    component mult_b = long_scalar_mult(n, k);
+    mult_b.a <-- scale;
+    for (var i = 0; i < k; i++){
+        mult_b.b[i] <-- b[i];
+    }
+    for (var i = 0; i < k + 1; i++){
+        norm_b[i] = mult_b.out[i];
+    }
+    var flag = (norm_b[k] != 0) ? 1 : 0;
+    component result1_div = short_div_norm(n, k + 1);
+    for (var i = 0; i < k + 1; i++){
+        result1_div.a[i] <-- norm_a[i];
+        result1_div.b[i] <-- norm_b[i];
+    }
+    result1_div.a[k + 1] <-- 0;
+    var result1 = result1_div.out;
 
-    return (norm_b[k] != 0) ? 
-        short_div_norm(n, k + 1, norm_a, norm_b) : 
-        short_div_norm(n, k, norm_a, norm_b);
+    component result2_div = short_div_norm(n, k);
+    for (var i = 0; i < k; i++){
+        result2_div.a[i] <-- norm_a[i];
+        result2_div.b[i] <-- norm_b[i];
+    }
+    result2_div.a[k] <-- norm_a[k];
+    var result2 = result2_div.out;
+    out <-- result1 * flag + result2 * ( 1- flag);
 }
 
-function prod(n, k, a, b) {
+template prod(n, k){
+    signal input a[k];
+    signal input b[k];
+    signal output out[2 * k];
     var prod_val[2 * k - 1];  // Size 2k-1
-    var out[2 * k];           // Size 2k
+    var result[2 * k];           // Size 2k
     var split[2 * k - 1][3];  // Size (2k-1) x 3
     var carry[2 * k - 1];     // Size 2k-1
     
@@ -259,21 +257,41 @@ function prod(n, k, a, b) {
 
     // Initialize first values
     carry[0] = 0;
-    out[0] = split[0][0];
+    result[0] = split[0][0];
 
     // Process remaining values
     if (2 * k - 1 > 1) {
         var sumAndCarry[2] = SplitFn(split[0][1] + split[1][0], n, n);
-        out[1] = sumAndCarry[0];
+        result[1] = sumAndCarry[0];
         carry[1] = sumAndCarry[1];
 
         for (var i = 2; i < 2 * k - 1; i++) {
             sumAndCarry = SplitFn(split[i][0] + split[i-1][1] + split[i-2][2] + carry[i-1], n, n);
-            out[i] = sumAndCarry[0];
+            result[i] = sumAndCarry[0];
             carry[i] = sumAndCarry[1];
         }
-        out[2 * k - 1] = split[2*k-2][1] + split[2*k-3][2] + carry[2*k-2];
+        result[2 * k - 1] = split[2*k-2][1] + split[2*k-3][2] + carry[2*k-2];
     }
 
-    return out;
+    out <-- result;
 } 
+
+
+template test_something(k){
+    
+    signal input a;
+    signal input b;
+    signal output c;
+    var test;
+    test = a + b;
+    c <-- test;
+}
+template test_run(n, k, m){
+    //log("long division result", long_div(n, k, m, [1, 1, 1, 1], [0, 1]));
+}
+
+component main = long_div(1, 2, 3);
+/* INPUT = {
+    "a": ["0", "1", "0", "1", "1"],
+    "b": ["1", "1"]
+} */
