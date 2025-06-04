@@ -1,41 +1,6 @@
 pragma circom 2.1.6;
+include "https://github.com/0xPARC/circom-secp256k1/blob/master/circuits/bigint.circom";
 
-function isNegative(x) {
-    // half babyjubjub field size
-    return x > 10944121435919637611123202872628637544274182200208017171849102093287904247808 ? 1 : 0;
-}
-
-function div_ceil(m, n) {
-    return (m + n - 1) \ n;
-}
-
-function log_ceil(n) {
-   var n_temp = n;
-   for (var i = 0; i < 254; i++) {
-       if (n_temp == 0) {
-          return i;
-       }
-       n_temp = n_temp \ 2;
-   }
-   return 254;
-}
-
-function SplitFn(in, n, m) {
-    return [in % (1 << n), (in \ (1 << n)) % (1 << m)];
-}
-
-function SplitThreeFn(in, n, m, k) {
-    return [in % (1 << n), (in \ (1 << n)) % (1 << m), (in \ (1 << (n + m))) % (1 << k)];
-}
-
-// 1 if true, 0 if false
-function long_gt(n, k, a, b) {
-    for (var i = k - 1; i >= 0; i--) {
-        if (a[i] > b[i]) return 1;
-        if (a[i] < b[i]) return 0;
-    }
-    return 0;
-}
 
 // n bits per register
 // a has k registers
@@ -240,58 +205,4 @@ template template_short_div(n, k) {
     //out = result2, if flag is false
     var result2 = result2_div.out;
     out <-- result1 * flag + result2 * ( 1- flag);
-}
-
-// n bits per register
-// a and b both have k registers
-// out has length 2 * k
-// adapted from BigMulShortLong and LongToShortNoEndCarry2 witness computation
-template template_prod(n, k){
-    signal input a[k];
-    signal input b[k];
-    signal output out[2 * k];
-    var prod_val[2 * k - 1];  // Size 2k-1
-    var result[2 * k];           // Size 2k
-    var split[2 * k - 1][3];  // Size (2k-1) x 3
-    var carry[2 * k - 1];     // Size 2k-1
-    
-    // Initialize arrays
-    for (var i = 0; i < 2 * k - 1; i++) {
-        prod_val[i] = 0;
-        carry[i] = 0;
-        if (i < k) {
-            for (var a_idx = 0; a_idx <= i; a_idx++) {
-                prod_val[i] += a[a_idx] * b[i - a_idx];
-            }
-        } else {
-            for (var a_idx = i - k + 1; a_idx < k; a_idx++) {
-                prod_val[i] += a[a_idx] * b[i - a_idx];
-            }
-        }
-    }
-
-    // Compute splits
-    for (var i = 0; i < 2 * k - 1; i++) {
-        split[i] = SplitThreeFn(prod_val[i], n, n, n);
-    }
-
-    // Initialize first values
-    carry[0] = 0;
-    result[0] = split[0][0];
-
-    // Process remaining values
-    if (2 * k - 1 > 1) {
-        var sumAndCarry[2] = SplitFn(split[0][1] + split[1][0], n, n);
-        result[1] = sumAndCarry[0];
-        carry[1] = sumAndCarry[1];
-
-        for (var i = 2; i < 2 * k - 1; i++) {
-            sumAndCarry = SplitFn(split[i][0] + split[i-1][1] + split[i-2][2] + carry[i-1], n, n);
-            result[i] = sumAndCarry[0];
-            carry[i] = sumAndCarry[1];
-        }
-        result[2 * k - 1] = split[2*k-2][1] + split[2*k-3][2] + carry[2*k-2];
-    }
-
-    out <-- result;
 }
