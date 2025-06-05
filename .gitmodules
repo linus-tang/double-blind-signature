@@ -1,0 +1,3 @@
+[submodule "libs/circom-secp256k1"]
+	path = libs/circom-secp256k1
+	url = https://github.com/0xPARC/circom-secp256k1.git
