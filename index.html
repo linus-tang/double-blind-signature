@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Group Signature Verification</title>
+    <script src="https://cdn.jsdelivr.net/npm/snarkjs@latest/build/snarkjs.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Group Signature Verification</h1>
+    <div class="container">
+        <div class="input-section">
+            <div class="form-group">
+                <label for="message">Message:</label>
+                <input type="text" id="message" placeholder="Enter message">
+            </div>
+
+            <div class="form-group">
+                <label for="signer_sk">Signature:</label>
+                <input type="text" id="signer_sk" placeholder="Enter signer private key">
+            </div>
+
+            <div class="form-group">
+                <label for="publicKeys">SSH Public Keys:</label>
+                <textarea id="publicKeys" placeholder="Enter SSH public keys, one per line. Example:&#10;ssh-rsa AAAAB3NzaC1yc2E... user@host&#10;ssh-rsa AAAAB3NzaC1yc2E... user@host"></textarea>
+            </div>
+
+            <button onclick="generateProof()">Generate Proof</button>
+            <div id="loading">Generating proof...</div>
+        </div>
+
+        <div class="proof-section">
+            <div class="form-group">
+                <label for="nValue">N Values:</label>
+                <textarea id="nValue"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="eValue">e Values:</label>
+                <textarea id="eValue"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="proofOutput">Generated Proof:</label>
+                <textarea id="proofOutput"></textarea>
+            </div>
+            
+            <button onclick="verifyProof()">Verify Proof</button>
+            <div id="verificationResult" class="verification-result"></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
