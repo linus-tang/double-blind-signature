@@ -1,0 +1,13 @@
+{
+  "name": "circom-snarkjs-example",
+  "version": "1.0.0",
+  "description": "Example project using circom and snarkjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "circomlib": "^2.0.5",
+    "snarkjs": "latest"
+  }
+}
