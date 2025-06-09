@@ -2,3 +2,5 @@
 *.ptau filter=lfs diff=lfs merge=lfs -text
 *.r1cs filter=lfs diff=lfs merge=lfs -text
 *.sym filter=lfs diff=lfs merge=lfs -text
+circuit_js/group_signature.r1cs filter=lfs diff=lfs merge=lfs -text
+circuit_js/group_signature.sym filter=lfs diff=lfs merge=lfs -text
