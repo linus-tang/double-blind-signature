@@ -5,3 +5,4 @@ circuit_0001.zkey
 pot20_final.ptau
 circuit_js/group_signature.r1cs
 circuit_js/group_signature.sym
+double-blind-signature-cleaned/
