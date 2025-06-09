@@ -3,7 +3,8 @@
 <head>
     <title>Group Signature Verification</title>
     <script src="https://cdn.jsdelivr.net/npm/snarkjs@latest/build/snarkjs.min.js"></script>
-    <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
+    <link rel="stylesheet" href="styles.css?v=1">
 </head>
 <body>
     <h1>Group Signature Verification</h1>
@@ -15,39 +16,42 @@
             </div>
 
             <div class="form-group">
-                <label for="signer_sk">Signature:</label>
-                <input type="text" id="signer_sk" placeholder="Enter signer private key">
+                <label for="signer_sk">Double-blind Key:</label>
+                <input type="text" id="signer_sk" placeholder="Enter SSHSIG in Base64 format (e.g., SSHSIG...)">
             </div>
 
             <div class="form-group">
-                <label for="publicKeys">SSH Public Keys:</label>
-                <textarea id="publicKeys" placeholder="Enter SSH public keys, one per line. Example:&#10;ssh-rsa AAAAB3NzaC1yc2E... user@host&#10;ssh-rsa AAAAB3NzaC1yc2E... user@host"></textarea>
+                <label for="signer_pk">Signer Public Key:</label>
+                <input type="text" id="signer_pk" placeholder="Enter RSA public key in SSH format">
+            </div>
+
+            <div class="form-group">
+                <label for="nValue">Group Public Keys:</label>
+                <textarea id="nValue"></textarea>
             </div>
 
             <button onclick="generateProof()">Generate Proof</button>
+            <button id="generateTestProof" onclick="generateTestProof()">Generate Test Proof</button>
             <div id="loading">Generating proof...</div>
         </div>
 
         <div class="proof-section">
             <div class="form-group">
-                <label for="nValue">N Values:</label>
-                <textarea id="nValue"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="eValue">e Values:</label>
-                <textarea id="eValue"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="proofOutput">Generated Proof:</label>
-                <textarea id="proofOutput"></textarea>
+                <label for="proofOutputContainer">Generated Proof:</label>
+                <div id="proofOutputContainer">
+                    <textarea id="proofOutput" rows="10" cols="80" readonly></textarea>
+                    <div id="proofProgress" style="display:none; margin-top: 10px;">
+                        <span>Generating proof, please wait...</span>
+                        <div style="width: 100%; background: #eee; border-radius: 4px; margin-top: 4px;">
+                            <div id="progressBar" style="width: 0%; height: 8px; background: #4caf50; border-radius: 4px; transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <button onclick="verifyProof()">Verify Proof</button>
             <div id="verificationResult" class="verification-result"></div>
         </div>
     </div>
-    <script src="script.js"></script>
 </body>
 </html>

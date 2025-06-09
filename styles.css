@@ -54,6 +54,14 @@ button:hover {
     background-color: #45a049;
 }
 
+#generateTestProof {
+    background-color: #2196F3;
+}
+
+#generateTestProof:hover {
+    background-color: #1976D2;
+}
+
 #loading {
     display: none;
     margin: 20px 0;
