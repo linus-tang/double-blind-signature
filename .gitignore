@@ -1,2 +1,7 @@
 input.json
 input (8).json
+circuit_0000.zkey
+circuit_0001.zkey
+pot20_final.ptau
+circuit_js/group_signature.r1cs
+circuit_js/group_signature.sym
